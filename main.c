@@ -1,13 +1,8 @@
-#undef G_DISABLE_ASSERT
-#undef G_LOG_DOMAIN
-
-#include <config.h>
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
-#include <glib.h>
+#include "/usr/local/include/glib-2.0/glib.h"
 
 
 #include <time.h>
@@ -25,8 +20,8 @@
 #include "common.h"  // xzl
 #include "measure.h"  // xzl
 
-my_key_t *keys;
-GHashTable* hash[1000] ; 
+my_key_t* keys;
+GHashTable* hash[1000]; 
 
 pthread_mutex_t* mutexes = NULL;
 pthread_mutex_t* table_mutex=NULL;
@@ -94,7 +89,16 @@ void signal_handler(int sigNum){
         print_errors("segfault");
     }
 }//signal handler for SIGSEGV
+my_key_t *alloc_keys(int numElements){
+	    fprintf(stderr, "init %d elements", numElements);
 
+	        my_key_t * keys = malloc(sizeof(my_key_t) * numElements);
+		    assert(keys);
+		        for(int i = 0; i < numElements; i++)
+				    	keys[i] = getRandomKey();
+
+			    return keys;
+}
 void* thread_func(void* thread_id){
     int id = *((int*)thread_id);
 
@@ -105,7 +109,6 @@ void* thread_func(void* thread_id){
 //    printf("i'm thread %d\n", id);
 
     int per_part = the_n_elements / the_config.numParts;
-/
 	for (int i = per_part * id; i < per_part * (id + 1); i++) {
 			// we carefully do malloc() w/o grabbing lock
 //			SortedListElement_t *p = malloc(sizeof(SortedListElement_t));
@@ -236,8 +239,8 @@ int main(int argc, char** argv) {
     diff -= start.tv_nsec;
     
     // we're done. correctness check up
-    {
-    	long total = 0;
+    //{
+   // 	long total = 0;
 /*
 #if defined(USE_MULTILISTS) || defined(USE_LB)
 			for(int i = 0; i < numThreads; i++) {
@@ -260,7 +263,9 @@ int main(int argc, char** argv) {
     print_csv_line(testname, numThreads, iterations, numParts, numOpts, diff);
 
     // --- clean up ---- //
-    free_locks(mutexes, 1, spinLocks);
+    free_locks(mutexes,1,NULL);
+    free(keys);
+    free_locks(table_mutex,1000,NULL);
 /*
 #ifdef USE_PREALLOC
     free(elements);
