@@ -1,0 +1,209 @@
+diff --git a/hello_world_1/host/main.c b/hello_world_origin/host/main.c
+index 860d80f..378082b 100644
+--- a/hello_world_1/host/main.c
++++ b/hello_world_origin/host/main.c
+@@ -74,20 +74,17 @@ int main(void)
+ 	 * Prepare the argument. Pass a value in the first parameter,
+ 	 * the remaining three parameters are unused.
+ 	 */
+-	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INOUT, TEEC_VALUE_INOUT,
++	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INOUT, TEEC_NONE,
+ 					 TEEC_NONE, TEEC_NONE);
+ 	op.params[0].value.a = 42;
+-	op.params[1].value.a = 0 ;
+ 
+ 	/*
+ 	 * TA_HELLO_WORLD_CMD_INC_VALUE is the actual function in the TA to be
+ 	 * called.
+ 	 */
+-	printf("hello!...Invoking TA to increment %d\n", op.params[0].value.a);
++	printf("Invoking TA to increment %d\n", op.params[0].value.a);
+ 	res = TEEC_InvokeCommand(&sess, TA_HELLO_WORLD_CMD_INC_VALUE, &op,
+ 				 &err_origin);
+-	if (res == TEEC_ERROR_EXCESS_DATA)
+-		errx(1, "TEEC OUT OF data range");
+ 	if (res != TEEC_SUCCESS)
+ 		errx(1, "TEEC_InvokeCommand failed with code 0x%x origin 0x%x",
+ 			res, err_origin);
+@@ -100,50 +97,10 @@ int main(void)
+ 	 * The TA will print "Goodbye!" in the log when the
+ 	 * session is closed.
+ 	 */
+-	
+ 
+ 	TEEC_CloseSession(&sess);
+ 
+ 	TEEC_FinalizeContext(&ctx);
+-	
+-	/*Test for reopen context session and reading values*/
+-	
+-	res = TEEC_InitializeContext(NULL, &ctx);
+-	if (res != TEEC_SUCCESS)
+-		errx(1, "TEEC_InitializeContext failed with code 0x%x", res);
+-
+-	/*
+-	 * Open a session to the "hello world" TA, the TA will print "hello
+-	 * world!" in the log when the session is created.
+-	 */
+-	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+-			       TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+-	if (res != TEEC_SUCCESS)
+-		errx(1, "TEEC_Opensession failed with code 0x%x origin 0x%x",
+-			res, err_origin);
+-	op.params[1].value.a=1;
+-        op.params[0].value.a=42;	
+-	printf("hello!...Invoking TA to increment %d\n", op.params[0].value.a);
+-	res = TEEC_InvokeCommand(&sess, TA_HELLO_WORLD_CMD_INC_VALUE, &op,
+-				 &err_origin);
+-	if (res == TEEC_ERROR_EXCESS_DATA)
+-		errx(1, "TEEC OUT OF data range");
+-	if (res != TEEC_SUCCESS)
+-		errx(1, "TEEC_InvokeCommand failed with code 0x%x origin 0x%x",
+-			res, err_origin);
+-	printf("TA incremented value to %d\n", op.params[0].value.a);
+ 
+-	/*
+-	 * We're done with the TA, close the session and
+-	 * destroy the context.
+-	 *
+-	 * The TA will print "Goodbye!" in the log when the
+-	 * session is closed.
+-	 */
+-	
+-
+-	TEEC_CloseSession(&sess);
+-
+-	TEEC_FinalizeContext(&ctx);
+ 	return 0;
+ }
+diff --git a/hello_world_1/ta/Makefile b/hello_world_origin/ta/Makefile
+index 3d2e6fc..45ad808 100644
+--- a/hello_world_1/ta/Makefile
++++ b/hello_world_origin/ta/Makefile
+@@ -1,5 +1,4 @@
+ CFG_TEE_TA_LOG_LEVEL ?= 4
+-CPPFLAGS += -DCFG_TEE_TA_LOG_LEVEL=$(CFG_TEE_TA_LOG_LEVEL)
+ 
+ # The UUID for the Trusted Application
+ BINARY=8aaaf200-2450-11e4-abe2-0002a5d5c51b
+diff --git a/hello_world_1/ta/hello_world_ta.c b/hello_world_origin/ta/hello_world_ta.c
+index 5dd7178..2423b30 100644
+--- a/hello_world_1/ta/hello_world_ta.c
++++ b/hello_world_origin/ta/hello_world_ta.c
+@@ -29,6 +29,7 @@
+ #include <tee_internal_api_extensions.h>
+ 
+ #include <hello_world_ta.h>
++
+ /*
+  * Called when the instance of the TA is created. This is the first call in
+  * the TA.
+@@ -97,93 +98,19 @@ static TEE_Result inc_value(uint32_t param_types,
+ 	TEE_Param params[4])
+ {
+ 	uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INOUT,
+-						   TEE_PARAM_TYPE_VALUE_INOUT,
++						   TEE_PARAM_TYPE_NONE,
+ 						   TEE_PARAM_TYPE_NONE,
+ 						   TEE_PARAM_TYPE_NONE);
+-	//intialize secure storage
+-	TEE_ObjectHandle object;
+-	TEE_Result res;
+-	char obj_id[]="object#1";
+-	size_t obj_id_sz=8;
+-	uint32_t obj_data_flag;
+-	int *data;
+-	size_t data_sz=4;
+-	uint32_t read_bytes;
+-	TEE_ObjectInfo object_info;
+-	obj_data_flag = TEE_DATA_FLAG_ACCESS_READ | TEE_DATA_FLAG_ACCESS_WRITE | TEE_DATA_FLAG_ACCESS_WRITE_META | TEE_DATA_FLAG_OVERWRITE;		/* destroy existing object of same ID */
+-	
+-	data = TEE_Malloc(data_sz, 0);
+-	//storage initalize over
+-	DMSG("now has been called");
++
++	DMSG("has been called");
+ 
+ 	if (param_types != exp_param_types)
+ 		return TEE_ERROR_BAD_PARAMETERS;
+-	DMSG("reading params");
+-	//reading
+-	if (params[1].value.a==1){
+-        res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE,
+-								obj_id, obj_id_sz,
+-													TEE_DATA_FLAG_ACCESS_READ |
+-																		TEE_DATA_FLAG_SHARE_READ,
+-																							&object);
+-	if (res != TEE_SUCCESS) {
+-				EMSG("Failed to open persistent object, res=0x%08x", res);
+-						TEE_Free(obj_id);
+-								TEE_Free(data);
+-										return res;
+-											}
+-
+-		res = TEE_GetObjectInfo1(object, &object_info);
+-			if (res != TEE_SUCCESS) {
+-						EMSG("Failed to create persistent object, res=0x%08x", res);
+-									}
+-	
+-	res = TEE_ReadObjectData(object, data, object_info.dataSize,
+-							 &read_bytes);
+-		if (res == TEE_SUCCESS)
+-					TEE_MemMove(&(params[0].value.a), data, read_bytes);
+-	}//
+-	DMSG("startgetting");
++
+ 	IMSG("Got value: %u from NW", params[0].value.a);
+-	params[0].value.a+=2;
+-	if (params[0].value.a>100)
+-		return TEE_ERROR_EXCESS_DATA;
++	params[0].value.a++;
+ 	IMSG("Increase value to: %u", params[0].value.a);
+-	DMSG("startsaving");
+-	//saving 
+-	TEE_MemMove(data, &(params[0].value.a), data_sz);
+-
+-	DMSG("copy before create");
+-res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE,obj_id, obj_id_sz,obj_data_flag,TEE_HANDLE_NULL,NULL,0,&object);
+-	if (res==TEE_ERROR_ACCESS_CONFLICT){
+-		DMSG("conflict error not an issue try open");
+-		res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE,obj_id,obj_id_sz,TEE_DATA_FLAG_ACCESS_READ |
+-									TEE_DATA_FLAG_ACCESS_WRITE,&object);
+-		TEE_CloseObject(object);
+-		TEE_Free(data);
+-		return TEE_SUCCESS;
+-	}
+-	//if (res != TEE_SUCCESS) {
+-	//			EMSG("TEE_CreatePersistentObject failed 0x%08x", res);
+-	//					TEE_Free(obj_id);
+-	//							TEE_Free(data);
+-	//									return res;
+-        //											}
+-	DMSG("successfully creating");
+-	res = TEE_WriteObjectData(object, data, data_sz);
+-		if (res != TEE_SUCCESS) {
+-					DMSG("Something wrong");
+-					EMSG("TEE_WriteObjectData failed 0x%08x", res);
+-							TEE_CloseAndDeletePersistentObject1(object);
+-								} else {
+-									DMSG("before closing");		
+-									TEE_CloseObject(object);
+-												}
+-		DMSG("successfully writing");	
+-		//TEE_Free(obj_id);
+-				TEE_Free(data);
+-	//
+-	DMSG("successfully free before return");
++
+ 	return TEE_SUCCESS;
+ }
+ 
+@@ -202,8 +129,6 @@ static TEE_Result dec_value(uint32_t param_types,
+ 
+ 	IMSG("Got value: %u from NW", params[0].value.a);
+ 	params[0].value.a--;
+-	if (params[0].value.a<0)
+-		return TEE_ERROR_EXCESS_DATA;
+ 	IMSG("Decrease value to: %u", params[0].value.a);
+ 
+ 	return TEE_SUCCESS;
